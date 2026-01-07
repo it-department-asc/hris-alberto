@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Bell,
@@ -20,6 +20,29 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { user, signOut } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Get current display name from user data
+  const currentDisplayName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || 'User';
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showUserMenu && !(event.target as Element).closest('.user-menu-container')) {
+        setShowUserMenu(false);
+      }
+      if (showNotifications && !(event.target as Element).closest('.notifications-container')) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showUserMenu || showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu, showNotifications]);
 
   const handleSignOut = async () => {
     try {
@@ -56,7 +79,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       {/* Right Section */}
       <div className="flex items-center gap-2">
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative notifications-container">
           <button
             onClick={() => {
               setShowNotifications(!showNotifications);
@@ -69,12 +92,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           </button>
 
           {showNotifications && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowNotifications(false)}
-              />
-              <div className="absolute right-0 top-full z-20 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+            <div className="absolute right-0 top-full z-20 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-900">
                   Notifications
                 </h3>
@@ -96,12 +114,11 @@ export function Header({ onMenuClick }: HeaderProps) {
                   View all notifications
                 </button>
               </div>
-            </>
           )}
         </div>
 
         {/* User Menu */}
-        <div className="relative">
+        <div className="relative user-menu-container">
           <button
             onClick={() => {
               setShowUserMenu(!showUserMenu);
@@ -110,11 +127,11 @@ export function Header({ onMenuClick }: HeaderProps) {
             className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-slate-100"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-bold text-white">
-              {user?.displayName?.charAt(0).toUpperCase()}
+              {currentDisplayName.charAt(0).toUpperCase()}
             </div>
             <div className="hidden text-left md:block">
               <p className="text-sm font-medium text-slate-900">
-                {user?.displayName}
+                {currentDisplayName}
               </p>
               <p className="text-xs capitalize text-slate-500">{user?.role}</p>
             </div>
@@ -122,15 +139,10 @@ export function Header({ onMenuClick }: HeaderProps) {
           </button>
 
           {showUserMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowUserMenu(false)}
-              />
-              <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 shadow-xl">
+            <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 shadow-xl">
                 <div className="border-b border-slate-100 px-4 pb-3 pt-2">
                   <p className="text-sm font-medium text-slate-900">
-                    {user?.displayName}
+                    {currentDisplayName}
                   </p>
                   <p className="text-xs text-slate-500">{user?.email}</p>
                 </div>
@@ -160,7 +172,6 @@ export function Header({ onMenuClick }: HeaderProps) {
                   </button>
                 </div>
               </div>
-            </>
           )}
         </div>
       </div>
