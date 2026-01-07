@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 
@@ -10,6 +10,24 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Initialize sidebar collapsed state from localStorage
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebarCollapsed');
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
+
+  // Save sidebar collapsed state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
+  const handleToggleCollapse = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -27,11 +45,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <Sidebar />
+        <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={handleToggleCollapse} />
       </div>
 
       {/* Main Content */}
-      <div className="transition-all duration-300 lg:ml-64">
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-6">{children}</main>
       </div>

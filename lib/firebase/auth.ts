@@ -31,6 +31,7 @@ export async function createUserDocument(
     displayName,
     role: additionalData.role || 'employee', // Default role
     employeeId: null, // Will be linked when employee record is created
+    departmentId: null, // Will be linked when assigned to department
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),

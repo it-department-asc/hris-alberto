@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,8 +37,12 @@ const navItems: NavItem[] = [
   { href: '/policy-advisor', label: 'AI Policy Advisor', icon: BrainCircuit, roles: ['admin', 'hr', 'payroll', 'manager', 'employee'] },
 ];
 
-export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+interface SidebarProps {
+  collapsed?: boolean;
+  onToggleCollapse?: (collapsed: boolean) => void;
+}
+
+export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
 
@@ -153,7 +156,7 @@ export function Sidebar() {
 
         {/* Collapse Button */}
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={() => onToggleCollapse?.(!collapsed)}
           className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-slate-400 shadow-lg transition-colors hover:bg-slate-700 hover:text-white"
         >
           {collapsed ? (
