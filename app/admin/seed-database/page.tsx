@@ -3,7 +3,8 @@
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { DashboardLayout } from '@/components/layout';
 import { seedAllData } from '@/lib/firebase/seed-data';
-import { Database, CheckCircle2, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { migrateUserDocuments } from '@/lib/firebase/migration';
+import { Database, CheckCircle2, AlertCircle, Loader2, RefreshCw, Users } from 'lucide-react';
 import { useState } from 'react';
 
 function SeedDatabaseContent() {
@@ -39,12 +40,40 @@ function SeedDatabaseContent() {
     }
   };
 
+  const handleMigrate = async () => {
+    setIsLoading(true);
+    setResult(null);
+
+    try {
+      const response = await migrateUserDocuments();
+      if (response.success) {
+        setResult({
+          success: true,
+          message: `Migration completed successfully! Updated ${response.migratedCount} user documents with new schema fields.`,
+        });
+      } else {
+        setResult({
+          success: false,
+          message: `Error migrating database: ${response.error}`,
+        });
+      }
+    } catch (error) {
+      setResult({
+        success: false,
+        message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const collections = [
     { name: 'departments', description: '16 departments (Admin, Accounting, IT, HR, etc.)' },
     { name: 'leaveTypes', description: '9 leave types (VL, SL, EL, ML, PL, etc.)' },
     { name: 'workSchedules', description: '5 work schedules (Day, Night, Retail, etc.)' },
     { name: 'holidays', description: '19 Philippine holidays for 2026' },
     { name: 'settings', description: 'System settings with government contribution rates' },
+    { name: 'users', description: 'Migrate existing user documents to new schema' },
   ];
 
   return (
@@ -114,7 +143,7 @@ function SeedDatabaseContent() {
       )}
 
       {/* Actions */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap">
         <button
           onClick={() => handleSeed(false)}
           disabled={isLoading}
@@ -139,6 +168,19 @@ function SeedDatabaseContent() {
             <RefreshCw className="h-5 w-5" />
           )}
           Force Re-seed All
+        </button>
+
+        <button
+          onClick={handleMigrate}
+          disabled={isLoading}
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 font-medium text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <Users className="h-5 w-5" />
+          )}
+          Migrate User Schema
         </button>
       </div>
 

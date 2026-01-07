@@ -9,12 +9,46 @@ export interface UserDocument {
   email: string;
   displayName: string;
   role: UserRole;
+
+  // Personal Information
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  dateOfBirth?: Date;
+  gender?: Gender;
+  civilStatus?: CivilStatus;
+  nationality?: string;
+
+  // Contact Information
+  personalEmail?: string;
+  mobileNumber?: string;
+  telephoneNumber?: string;
+  presentAddress?: string;
+  permanentAddress?: string;
+
+  // Employment Information
   employeeId: string | null;
   departmentId: string | null;
+  positionId?: string;
+  hireDate?: Date;
+  employmentStatus?: EmploymentStatus;
+
+  // Emergency Contact
+  emergencyContactName?: string;
+  emergencyContactRelationship?: string;
+  emergencyContactNumber?: string;
+
+  // Profile
+  profilePhotoUrl?: string;
+  bio?: string;
+
+  // System Fields
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
   lastLoginAt: Date | null;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 export interface RegistrationData {
