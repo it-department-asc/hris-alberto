@@ -29,13 +29,47 @@ export async function createUserDocument(
     uid: user.uid,
     email: user.email!,
     displayName,
-    role: additionalData.role || 'employee', // Default role
-    employeeId: null, // Will be linked when employee record is created
-    departmentId: null, // Will be linked when assigned to department
+    role: additionalData.role || 'employee',
+    
+    // Personal Information
+    firstName: additionalData.firstName,
+    lastName: additionalData.lastName,
+    middleName: undefined,
+    dateOfBirth: undefined,
+    gender: undefined,
+    civilStatus: undefined,
+    nationality: undefined,
+    
+    // Contact Information
+    personalEmail: undefined,
+    mobileNumber: undefined,
+    telephoneNumber: undefined,
+    presentAddress: undefined,
+    permanentAddress: undefined,
+    
+    // Employment Information
+    employeeId: null,
+    departmentId: null,
+    positionId: undefined,
+    hireDate: undefined,
+    employmentStatus: undefined,
+    
+    // Emergency Contact
+    emergencyContactName: undefined,
+    emergencyContactRelationship: undefined,
+    emergencyContactNumber: undefined,
+    
+    // Profile
+    profilePhotoUrl: undefined,
+    bio: undefined,
+    
+    // System Fields
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastLoginAt: null,
+    createdBy: undefined,
+    updatedBy: undefined,
   };
 
   await setDoc(userRef, {
