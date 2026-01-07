@@ -1,0 +1,335 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Get user document
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    // Check user role
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().role == role;
+    }
+    
+    // Check if user has any of the specified roles
+    function hasAnyRole(roles) {
+      return isAuthenticated() && getUserData().role in roles;
+    }
+    
+    // Check if user is admin
+    function isAdmin() {
+      return hasRole('admin');
+    }
+    
+    // Check if user is HR
+    function isHR() {
+      return hasRole('hr');
+    }
+    
+    // Check if user is payroll
+    function isPayroll() {
+      return hasRole('payroll');
+    }
+    
+    // Check if user is manager
+    function isManager() {
+      return hasRole('manager');
+    }
+    
+    // Check if user is admin or HR
+    function isAdminOrHR() {
+      return hasAnyRole(['admin', 'hr']);
+    }
+    
+    // Check if user is admin, HR, or employee (temporary for seeding)
+    function canSeedData() {
+      return hasAnyRole(['admin', 'hr', 'employee']);
+    }
+    
+    // TEMPORARY: Allow all operations for authenticated users during seeding
+    function allowAllForSeeding() {
+      return isAuthenticated();
+    }
+    
+    // Check if user is admin, HR, or manager
+    function isManagement() {
+      return hasAnyRole(['admin', 'hr', 'manager']);
+    }
+    
+    // Check if user is admin, HR, or payroll
+    function canAccessPayroll() {
+      return hasAnyRole(['admin', 'hr', 'payroll']);
+    }
+    
+    // Check if the document belongs to the current user's employee record
+    function isOwnEmployeeRecord(employeeId) {
+      return isAuthenticated() && getUserData().employeeId == employeeId;
+    }
+    
+    // Check if user is the owner of the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    match /users/{userId} {
+      // Users can read their own document, admin/HR can read all
+      allow read: if isOwner(userId) || isAdminOrHR();
+      
+      // Only the user can create their own document (during registration)
+      allow create: if isOwner(userId);
+      
+      // Users can update their own profile (except role), admin can update all
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isActive'])) 
+                    || isAdmin();
+      
+      // Only admin can delete users
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // DEPARTMENTS COLLECTION
+    // ============================================
+    match /departments/{departmentId} {
+      // TEMPORARY: Allow all operations for authenticated users during seeding
+      allow read, write: if allowAllForSeeding();
+    }
+    
+    // ============================================
+    // POSITIONS COLLECTION
+    // ============================================
+    match /positions/{positionId} {
+      // All authenticated users can read positions
+      allow read: if isAuthenticated();
+      
+      // Only admin/HR can create, update, delete
+      allow create, update, delete: if isAdminOrHR();
+    }
+    
+    // ============================================
+    // EMPLOYEES COLLECTION
+    // ============================================
+    match /employees/{employeeId} {
+      // Employees can read their own record, management can read all
+      allow read: if isOwnEmployeeRecord(employeeId) || isManagement();
+      
+      // Only admin/HR can create employees
+      allow create: if isAdminOrHR();
+      
+      // Employees can update limited fields, admin/HR can update all
+      allow update: if isAdminOrHR() 
+                    || (isOwnEmployeeRecord(employeeId) 
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                          'personalEmail', 'mobileNumber', 'telephoneNumber', 
+                          'presentAddress', 'permanentAddress', 'profilePhotoUrl'
+                        ]));
+      
+      // Only admin can delete employees
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // EMERGENCY CONTACTS COLLECTION
+    // ============================================
+    match /emergencyContacts/{contactId} {
+      // Employees can read their own, admin/HR can read all
+      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isAdminOrHR();
+      
+      // Employees can manage their own emergency contacts
+      allow create: if isOwnEmployeeRecord(request.resource.data.employeeId) || isAdminOrHR();
+      allow update, delete: if isOwnEmployeeRecord(resource.data.employeeId) || isAdminOrHR();
+    }
+    
+    // ============================================
+    // ATTENDANCE COLLECTION
+    // ============================================
+    match /attendance/{attendanceId} {
+      // Employees can read their own, management can read all
+      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isManagement();
+      
+      // System/HR can create attendance records
+      allow create: if isAdminOrHR();
+      
+      // Only admin/HR can update (for corrections)
+      allow update: if isAdminOrHR();
+      
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // WORK SCHEDULES COLLECTION
+    // ============================================
+    match /workSchedules/{scheduleId} {
+      // TEMPORARY: Allow all operations for authenticated users during seeding
+      allow read, write: if allowAllForSeeding();
+    }
+    
+    // ============================================
+    // LEAVE TYPES COLLECTION
+    // ============================================
+    match /leaveTypes/{leaveTypeId} {
+      // TEMPORARY: Allow all operations for authenticated users during seeding
+      allow read, write: if allowAllForSeeding();
+    }
+    
+    // ============================================
+    // LEAVE BALANCES COLLECTION
+    // ============================================
+    match /leaveBalances/{balanceId} {
+      // Employees can read their own, admin/HR can read all
+      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isAdminOrHR();
+      
+      // Only admin/HR can manage leave balances
+      allow create, update, delete: if isAdminOrHR();
+    }
+    
+    // ============================================
+    // LEAVE REQUESTS COLLECTION
+    // ============================================
+    match /leaveRequests/{requestId} {
+      // Employees can read their own, management can read all
+      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isManagement();
+      
+      // Employees can create their own leave requests
+      allow create: if isOwnEmployeeRecord(request.resource.data.employeeId);
+      
+      // Employees can cancel their own pending requests, management can approve/reject
+      allow update: if isManagement() 
+                    || (isOwnEmployeeRecord(resource.data.employeeId) 
+                        && resource.data.status == 'pending'
+                        && request.resource.data.status == 'cancelled');
+      
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // OVERTIME REQUESTS COLLECTION
+    // ============================================
+    match /overtimeRequests/{requestId} {
+      // Employees can read their own, management can read all
+      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isManagement();
+      
+      // Employees can create their own OT requests
+      allow create: if isOwnEmployeeRecord(request.resource.data.employeeId);
+      
+      // Employees can cancel their own pending requests, management can approve/reject
+      allow update: if isManagement() 
+                    || (isOwnEmployeeRecord(resource.data.employeeId) 
+                        && resource.data.status == 'pending'
+                        && request.resource.data.status == 'cancelled');
+      
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // PAYROLL PERIODS COLLECTION
+    // ============================================
+    match /payrollPeriods/{periodId} {
+      // Payroll team and admin can read
+      allow read: if canAccessPayroll();
+      
+      // Only payroll team can create/update
+      allow create, update: if canAccessPayroll();
+      
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // PAYROLL RECORDS COLLECTION
+    // ============================================
+    match /payrollRecords/{recordId} {
+      // Employees can read their own, payroll team can read all
+      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || canAccessPayroll();
+      
+      // Only payroll team can manage
+      allow create, update: if canAccessPayroll();
+      
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // SALARY HISTORY COLLECTION
+    // ============================================
+    match /salaryHistory/{historyId} {
+      // Employees can read their own, admin/HR can read all
+      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isAdminOrHR();
+      
+      // Only admin/HR can manage
+      allow create, update, delete: if isAdminOrHR();
+    }
+    
+    // ============================================
+    // EMPLOYEE DOCUMENTS COLLECTION
+    // ============================================
+    match /employeeDocuments/{documentId} {
+      // Employees can read their own, admin/HR can read all
+      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isAdminOrHR();
+      
+      // Employees can upload their own documents, admin/HR can upload for anyone
+      allow create: if isOwnEmployeeRecord(request.resource.data.employeeId) || isAdminOrHR();
+      
+      // Admin/HR can update/delete
+      allow update, delete: if isAdminOrHR();
+    }
+    
+    // ============================================
+    // ANNOUNCEMENTS COLLECTION
+    // ============================================
+    match /announcements/{announcementId} {
+      // All authenticated users can read published announcements
+      allow read: if isAuthenticated() && (resource.data.isPublished == true || isAdminOrHR());
+      
+      // Only admin/HR can manage announcements
+      allow create, update, delete: if isAdminOrHR();
+    }
+    
+    // ============================================
+    // HOLIDAYS COLLECTION
+    // ============================================
+    match /holidays/{holidayId} {
+      // TEMPORARY: Allow all operations for authenticated users during seeding
+      allow read, write: if allowAllForSeeding();
+    }
+    
+    // ============================================
+    // AUDIT LOGS COLLECTION
+    // ============================================
+    match /auditLogs/{logId} {
+      // Only admin can read audit logs
+      allow read: if isAdmin();
+      
+      // System creates audit logs (via Cloud Functions ideally)
+      // For now, any authenticated user can create (their actions are logged)
+      allow create: if isAuthenticated();
+      
+      // No one can update or delete audit logs
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // SYSTEM SETTINGS COLLECTION
+    // ============================================
+    match /settings/{settingId} {
+      // TEMPORARY: Allow all operations for authenticated users during seeding
+      allow read, write: if allowAllForSeeding();
+    }
+  }
+}

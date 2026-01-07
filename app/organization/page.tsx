@@ -1,18 +1,56 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { DashboardLayout } from '@/components/layout';
-import { Network, Building2, Users, Briefcase, ChevronRight } from 'lucide-react';
+import { Network, Building2, Users, Briefcase, ChevronRight, Loader2 } from 'lucide-react';
+import { getDepartments, getDepartmentStats } from '@/lib/firebase/departments';
+import { Department } from '@/types';
+
+interface DepartmentWithStats extends Department {
+  employeeCount: number;
+  managerName: string | null;
+}
 
 function OrganizationContent() {
-  const departments = [
-    { name: 'Engineering', employees: 45, head: 'John Smith', color: 'blue' },
-    { name: 'Human Resources', employees: 12, head: 'Maria Santos', color: 'emerald' },
-    { name: 'Finance', employees: 18, head: 'Pedro Garcia', color: 'violet' },
-    { name: 'Marketing', employees: 25, head: 'Ana Reyes', color: 'amber' },
-    { name: 'Operations', employees: 38, head: 'Carlos Mendoza', color: 'rose' },
-    { name: 'Sales', employees: 52, head: 'Lisa Cruz', color: 'cyan' },
-  ];
+  const [departments, setDepartments] = useState<DepartmentWithStats[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const departmentsData = await getDepartments();
+
+      // Fetch stats for each department
+      const departmentsWithStats = await Promise.all(
+        departmentsData.map(async (dept) => {
+          const stats = await getDepartmentStats(dept.id, dept.managerId);
+          return {
+            ...dept,
+            employeeCount: stats.employeeCount,
+            managerName: stats.managerName,
+          };
+        })
+      );
+
+      setDepartments(departmentsWithStats);
+    } catch (err) {
+      console.error('Error fetching departments:', err);
+      setError('Failed to load departments. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalEmployees = departments.reduce((sum, dept) => sum + dept.employeeCount, 0);
+  const totalPositions = departments.length; // This could be enhanced to count actual positions
 
   const colorClasses: Record<string, { bg: string; border: string; icon: string }> = {
     blue: { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'text-blue-600' },
@@ -21,6 +59,11 @@ function OrganizationContent() {
     amber: { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'text-amber-600' },
     rose: { bg: 'bg-rose-50', border: 'border-rose-200', icon: 'text-rose-600' },
     cyan: { bg: 'bg-cyan-50', border: 'border-cyan-200', icon: 'text-cyan-600' },
+  };
+
+  const getDepartmentColor = (index: number): string => {
+    const colors = Object.keys(colorClasses);
+    return colors[index % colors.length];
   };
 
   return (
@@ -40,7 +83,9 @@ function OrganizationContent() {
             </div>
             <div>
               <p className="text-sm text-slate-500">Departments</p>
-              <p className="text-2xl font-bold text-slate-900">6</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : departments.length}
+              </p>
             </div>
           </div>
         </div>
@@ -51,7 +96,9 @@ function OrganizationContent() {
             </div>
             <div>
               <p className="text-sm text-slate-500">Total Employees</p>
-              <p className="text-2xl font-bold text-slate-900">190</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : totalEmployees}
+              </p>
             </div>
           </div>
         </div>
@@ -62,7 +109,9 @@ function OrganizationContent() {
             </div>
             <div>
               <p className="text-sm text-slate-500">Positions</p>
-              <p className="text-2xl font-bold text-slate-900">42</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : totalPositions}
+              </p>
             </div>
           </div>
         </div>
@@ -70,33 +119,72 @@ function OrganizationContent() {
 
       {/* Departments */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-6 text-lg font-semibold text-slate-900">Departments</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {departments.map((dept) => {
-            const colors = colorClasses[dept.color];
-            return (
-              <div
-                key={dept.name}
-                className={`rounded-xl border ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md cursor-pointer`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="rounded-lg bg-white p-2 shadow-sm">
-                    <Network className={`h-5 w-5 ${colors.icon}`} />
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-slate-400" />
-                </div>
-                <h3 className="mt-4 font-semibold text-slate-900">{dept.name}</h3>
-                <p className="mt-1 text-sm text-slate-500">{dept.employees} employees</p>
-                <div className="mt-4 flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-white text-xs font-bold flex items-center justify-center text-slate-600 shadow-sm">
-                    {dept.head.split(' ').map(n => n[0]).join('')}
-                  </div>
-                  <span className="text-xs text-slate-600">{dept.head}</span>
-                </div>
-              </div>
-            );
-          })}
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Departments</h2>
+          {error && (
+            <button
+              onClick={fetchDepartments}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Retry
+            </button>
+          )}
         </div>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            <span className="ml-2 text-slate-500">Loading departments...</span>
+          </div>
+        ) : departments.length === 0 ? (
+          <div className="text-center py-12">
+            <Network className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-900 mb-2">No departments found</h3>
+            <p className="text-slate-500">Departments will appear here once they are added to the system.</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {departments.map((dept, index) => {
+              const colorKey = getDepartmentColor(index);
+              const colors = colorClasses[colorKey];
+              return (
+                <div
+                  key={dept.id}
+                  className={`rounded-xl border ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md cursor-pointer`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="rounded-lg bg-white p-2 shadow-sm">
+                      <Network className={`h-5 w-5 ${colors.icon}`} />
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <h3 className="mt-4 font-semibold text-slate-900">{dept.name}</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {dept.employeeCount} {dept.employeeCount === 1 ? 'employee' : 'employees'}
+                  </p>
+                  <div className="mt-4 flex items-center gap-2">
+                    {dept.managerName ? (
+                      <>
+                        <div className="h-6 w-6 rounded-full bg-white text-xs font-bold flex items-center justify-center text-slate-600 shadow-sm">
+                          {dept.managerName.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <span className="text-xs text-slate-600">{dept.managerName}</span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">No manager assigned</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
