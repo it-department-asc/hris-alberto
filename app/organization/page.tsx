@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { DashboardLayout } from '@/components/layout';
-import { Network, Building2, Users, Briefcase, ChevronRight, Loader2 } from 'lucide-react';
+import { Network, Building2, Users, Briefcase, ChevronRight, Loader2, UserX, RefreshCw } from 'lucide-react';
 import { getDepartments, getDepartmentStats } from '@/lib/firebase/departments';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 import { Department } from '@/types';
 
 interface DepartmentWithStats extends Department {
@@ -16,6 +18,9 @@ function OrganizationContent() {
   const [departments, setDepartments] = useState<DepartmentWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [totalEmployees, setTotalEmployees] = useState(0);
+  const [unassignedEmployees, setUnassignedEmployees] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchDepartments();
@@ -41,6 +46,19 @@ function OrganizationContent() {
       );
 
       setDepartments(departmentsWithStats);
+
+      // Get total employee count (all active users)
+      const usersRef = collection(db, 'users');
+      const allUsersQuery = query(usersRef, where('isActive', '==', true));
+      const allUsersSnapshot = await getDocs(allUsersQuery);
+      const totalCount = allUsersSnapshot.size;
+      setTotalEmployees(totalCount);
+
+      // Calculate unassigned employees (users without departmentId)
+      const assignedCount = departmentsWithStats.reduce((sum, dept) => sum + dept.employeeCount, 0);
+      setUnassignedEmployees(totalCount - assignedCount);
+
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Error fetching departments:', err);
       setError('Failed to load departments. Please try again.');
@@ -49,7 +67,7 @@ function OrganizationContent() {
     }
   };
 
-  const totalEmployees = departments.reduce((sum, dept) => sum + dept.employeeCount, 0);
+  const assignedEmployees = departments.reduce((sum, dept) => sum + dept.employeeCount, 0);
   const totalPositions = departments.length; // This could be enhanced to count actual positions
 
   const colorClasses: Record<string, { bg: string; border: string; icon: string }> = {
@@ -70,12 +88,29 @@ function OrganizationContent() {
     <DashboardLayout>
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Organization</h1>
-        <p className="mt-1 text-slate-500">View and manage your company structure</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Organization</h1>
+            <p className="mt-1 text-slate-500">View and manage your company structure</p>
+            {lastUpdated && (
+              <p className="mt-1 text-xs text-slate-400">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={fetchDepartments}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Company Overview */}
-      <div className="mb-8 grid gap-6 sm:grid-cols-3">
+      <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="rounded-xl bg-blue-100 p-3">
@@ -108,9 +143,22 @@ function OrganizationContent() {
               <Briefcase className="h-6 w-6 text-violet-600" />
             </div>
             <div>
-              <p className="text-sm text-slate-500">Positions</p>
+              <p className="text-sm text-slate-500">Assigned</p>
               <p className="text-2xl font-bold text-slate-900">
-                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : totalPositions}
+                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : assignedEmployees}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="rounded-xl bg-amber-100 p-3">
+              <UserX className="h-6 w-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Unassigned</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : unassignedEmployees}
               </p>
             </div>
           </div>

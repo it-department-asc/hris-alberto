@@ -7,6 +7,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getUserProfile, updateUserProfile } from '@/lib/firebase/users';
 import { getDepartments } from '@/lib/firebase/departments';
 import { UserDocument, Department } from '@/types';
+import { useConfirm } from '@/hooks/use-confirm';
+import { ProfileSeeder } from '@/components/ProfileSeeder';
+import toast from 'react-hot-toast';
 import {
   User,
   Camera,
@@ -23,14 +26,39 @@ import {
 } from 'lucide-react';
 
 function ProfileContent() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, refreshUser } = useAuth();
   const [profile, setProfile] = useState<UserDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
 
-  // Form state
+  const [ConfirmDialog, confirm] = useConfirm(
+    'Save Changes',
+    'Are you sure you want to save these changes to your profile?'
+  );
+
+  // Check if there are any changes
+  const hasChanges = () => {
+    if (!profile) return false;
+
+    return (
+      formData.firstName !== (profile.firstName || '') ||
+      formData.lastName !== (profile.lastName || '') ||
+      formData.middleName !== (profile.middleName || '') ||
+      formData.personalEmail !== (profile.personalEmail || '') ||
+      formData.mobileNumber !== (profile.mobileNumber || '') ||
+      formData.telephoneNumber !== (profile.telephoneNumber || '') ||
+      formData.presentAddress !== (profile.presentAddress || '') ||
+      formData.permanentAddress !== (profile.permanentAddress || '') ||
+      formData.emergencyContactName !== (profile.emergencyContactName || '') ||
+      formData.emergencyContactRelationship !== (profile.emergencyContactRelationship || '') ||
+      formData.emergencyContactNumber !== (profile.emergencyContactNumber || '') ||
+      formData.bio !== (profile.bio || '') ||
+      formData.employeeId !== (profile.employeeId || '') ||
+      formData.departmentId !== (profile.departmentId || '')
+    );
+  };
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -104,41 +132,84 @@ function ProfileContent() {
   const handleSave = async () => {
     if (!authUser?.uid || !profile) return;
 
+    // Check if user confirms the save
+    const ok = await confirm();
+    if (!ok) return;
+
     try {
       setSaving(true);
       setSaveSuccess(false);
 
       const updates: Partial<UserDocument> = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        middleName: formData.middleName || undefined,
-        personalEmail: formData.personalEmail || undefined,
-        mobileNumber: formData.mobileNumber || undefined,
-        telephoneNumber: formData.telephoneNumber || undefined,
-        presentAddress: formData.presentAddress || undefined,
-        permanentAddress: formData.permanentAddress || undefined,
-        emergencyContactName: formData.emergencyContactName || undefined,
-        emergencyContactRelationship: formData.emergencyContactRelationship || undefined,
-        emergencyContactNumber: formData.emergencyContactNumber || undefined,
-        bio: formData.bio || undefined,
         employeeId: formData.employeeId || null,
         departmentId: formData.departmentId || null,
-        displayName: `${formData.firstName} ${formData.lastName}`.trim(),
+        displayName: `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || 'User',
       };
+
+      // Include firstName and lastName only if they have values
+      if (formData.firstName?.trim()) {
+        updates.firstName = formData.firstName;
+      }
+      if (formData.lastName?.trim()) {
+        updates.lastName = formData.lastName;
+      }
+
+      // Only include optional fields if they have values
+      if (formData.middleName.trim()) {
+        updates.middleName = formData.middleName;
+      }
+      if (formData.personalEmail.trim()) {
+        updates.personalEmail = formData.personalEmail;
+      }
+      if (formData.mobileNumber.trim()) {
+        updates.mobileNumber = formData.mobileNumber;
+      }
+      if (formData.telephoneNumber.trim()) {
+        updates.telephoneNumber = formData.telephoneNumber;
+      }
+      if (formData.presentAddress.trim()) {
+        updates.presentAddress = formData.presentAddress;
+      }
+      if (formData.permanentAddress.trim()) {
+        updates.permanentAddress = formData.permanentAddress;
+      }
+      if (formData.emergencyContactName.trim()) {
+        updates.emergencyContactName = formData.emergencyContactName;
+      }
+      if (formData.emergencyContactRelationship.trim()) {
+        updates.emergencyContactRelationship = formData.emergencyContactRelationship;
+      }
+      if (formData.emergencyContactNumber.trim()) {
+        updates.emergencyContactNumber = formData.emergencyContactNumber;
+      }
+      if (formData.bio.trim()) {
+        updates.bio = formData.bio;
+      }
 
       await updateUserProfile(authUser.uid, updates);
 
       // Update local profile state
       setProfile(prev => prev ? { ...prev, ...updates } : null);
 
+      // Refresh user data in auth context
+      await refreshUser();
+
+      // Show success toast
+      toast.success('Profile updated successfully!');
+
       // The AuthContext will automatically update when Firestore document changes
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
       console.error('Error saving profile:', error);
+      toast.error('Failed to update profile. Please try again.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSeedData = (seedData: any) => {
+    setFormData(prev => ({ ...prev, ...seedData }));
   };
 
   // Parse display name for initials
@@ -146,6 +217,12 @@ function ProfileContent() {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
+
+  // Get current display name from form data
+  const currentDisplayName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || 'User';
+
+  // Get current department name
+  const currentDepartment = departments.find(d => d.id === formData.departmentId);
 
   if (loading) {
     return (
@@ -185,18 +262,15 @@ function ProfileContent() {
             <div className="flex flex-col items-center">
               <div className="relative">
                 <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-3xl font-bold text-white">
-                  {getInitials(profile.displayName)}
+                  {getInitials(currentDisplayName)}
                 </div>
                 <button className="absolute bottom-0 right-0 rounded-full bg-white p-2 shadow-lg border border-slate-200 hover:bg-slate-50">
                   <Camera className="h-4 w-4 text-slate-600" />
                 </button>
               </div>
               <h2 className="mt-4 text-xl font-semibold text-slate-900">
-                {profile.displayName || 'User'}
+                {currentDisplayName}
               </h2>
-              <p className="text-slate-500">
-                {profile.positionId ? 'Position Title' : 'Employee'}
-              </p>
               <div className="mt-4 flex items-center gap-2">
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
@@ -218,23 +292,23 @@ function ProfileContent() {
                 <Mail className="h-5 w-5 text-slate-400" />
                 <span className="text-sm">{profile.email}</span>
               </div>
-              {profile.mobileNumber && (
+              {formData.mobileNumber && (
                 <div className="flex items-center gap-3 text-slate-600">
                   <Phone className="h-5 w-5 text-slate-400" />
-                  <span className="text-sm">{profile.mobileNumber}</span>
+                  <span className="text-sm">{formData.mobileNumber}</span>
                 </div>
               )}
-              {profile.presentAddress && (
+              {formData.presentAddress && (
                 <div className="flex items-center gap-3 text-slate-600">
                   <MapPin className="h-5 w-5 text-slate-400" />
-                  <span className="text-sm">{profile.presentAddress}</span>
+                  <span className="text-sm">{formData.presentAddress}</span>
                 </div>
               )}
-              {profile.departmentId && (
+              {currentDepartment && (
                 <div className="flex items-center gap-3 text-slate-600">
                   <Building2 className="h-5 w-5 text-slate-400" />
                   <span className="text-sm">
-                    Department: {departments.find(d => d.id === profile.departmentId)?.name || profile.departmentId}
+                    {currentDepartment.name}
                   </span>
                 </div>
               )}
@@ -246,10 +320,10 @@ function ProfileContent() {
                   </span>
                 </div>
               )}
-              {profile.employeeId && (
+              {formData.employeeId && (
                 <div className="flex items-center gap-3 text-slate-600">
                   <Briefcase className="h-5 w-5 text-slate-400" />
-                  <span className="text-sm">Employee ID: {profile.employeeId}</span>
+                  <span className="text-sm">Employee ID: {formData.employeeId}</span>
                 </div>
               )}
             </div>
@@ -452,16 +526,17 @@ function ProfileContent() {
               </div>
             </div>
 
-            <div className="mt-8 flex justify-end">
+            <div className="mt-8 flex justify-end gap-3">
               {saveSuccess && (
                 <div className="mr-4 flex items-center gap-2 text-emerald-600">
                   <CheckCircle2 className="h-5 w-5" />
                   <span className="text-sm font-medium">Profile updated successfully!</span>
                 </div>
               )}
+              <ProfileSeeder departments={departments} onSeed={handleSeedData} />
               <button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || !hasChanges()}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/25 transition-all hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? (
@@ -475,6 +550,7 @@ function ProfileContent() {
           </div>
         </div>
       </div>
+      <ConfirmDialog />
     </DashboardLayout>
   );
 }

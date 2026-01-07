@@ -29,11 +29,11 @@ export async function getDepartmentStats(departmentId: string, managerId: string
   managerName: string | null;
 }> {
   try {
-    // Get employee count for this department
-    const employeesRef = collection(db, 'employees');
-    const employeeQuery = query(employeesRef, where('departmentId', '==', departmentId));
-    const employeeSnapshot = await getDocs(employeeQuery);
-    const employeeCount = employeeSnapshot.size;
+    // Get employee count for this department from users collection
+    const usersRef = collection(db, 'users');
+    const userQuery = query(usersRef, where('departmentId', '==', departmentId), where('isActive', '==', true));
+    const userSnapshot = await getDocs(userQuery);
+    const employeeCount = userSnapshot.size;
 
     // Get manager name if managerId is provided
     let managerName = null;
