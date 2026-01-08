@@ -90,11 +90,12 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isAdminOrHR();
       
       // Only the user can create their own document (during registration)
-      allow create: if isOwner(userId);
+      // Admin/HR can also create user documents (for adding employees)
+      allow create: if isOwner(userId) || isAdminOrHR();
       
-      // Users can update their own profile (except role), admin can update all
+      // Users can update their own profile (except role/isActive), admin/HR can update all
       allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isActive'])) 
-                    || isAdmin();
+                    || isAdminOrHR();
       
       // Only admin can delete users
       allow delete: if isAdmin();

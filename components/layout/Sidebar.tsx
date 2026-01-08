@@ -17,6 +17,8 @@ import {
   Settings,
   Bell,
   User,
+  GitBranch,
+  Building2,
 } from 'lucide-react';
 import { UserRole } from '@/types';
 
@@ -30,7 +32,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'hr', 'payroll', 'manager', 'employee'] },
   { href: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'hr'] },
-  { href: '/organization', label: 'Organization', icon: Network, roles: ['admin', 'hr', 'payroll', 'manager', 'employee'] },
+  { href: '/departments', label: 'Departments', icon: Building2, roles: ['admin', 'hr', 'payroll', 'manager'] },
+  { href: '/org-chart', label: 'Org Chart', icon: GitBranch, roles: ['admin', 'hr', 'payroll', 'manager', 'employee'] },
   { href: '/attendance', label: 'Attendance', icon: Clock, roles: ['admin', 'hr', 'manager'] },
   { href: '/leave', label: 'Leave', icon: CalendarPlus, roles: ['admin', 'hr', 'payroll', 'manager', 'employee'] },
   { href: '/payroll', label: 'Payroll', icon: Newspaper, roles: ['admin', 'payroll'] },
