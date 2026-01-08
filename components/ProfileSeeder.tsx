@@ -87,9 +87,9 @@ function generateAddress(): string {
 }
 
 function generateEmployeeId(): string {
-  const prefix = 'EMP';
+  const prefix = 'AG_';
   const number = Math.floor(Math.random() * 9999) + 1;
-  return `${prefix}${number.toString().padStart(3, '0')}`;
+  return `${prefix}${number.toString().padStart(4, '0')}`;
 }
 
 export function ProfileSeeder({ departments, onSeed }: ProfileSeederProps) {

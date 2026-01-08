@@ -15,7 +15,7 @@ interface DepartmentWithStats extends Department {
   managerName: string | null;
 }
 
-function OrganizationContent() {
+function DepartmentsContent() {
   const { user } = useAuth();
   const [departments, setDepartments] = useState<DepartmentWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,7 @@ function OrganizationContent() {
   const [unassignedEmployees, setUnassignedEmployees] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Check if user has access to organization module
+  // Check if user has access to departments module
   const authorizedRoles = ['admin', 'hr', 'payroll', 'manager'];
   const hasAccess = user && authorizedRoles.includes(user.role);
 
@@ -260,10 +260,10 @@ function OrganizationContent() {
   );
 }
 
-export default function OrganizationPage() {
+export default function DepartmentsPage() {
   return (
     <AuthGuard>
-      <OrganizationContent />
+      <DepartmentsContent />
     </AuthGuard>
   );
 }
