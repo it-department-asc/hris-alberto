@@ -30,6 +30,7 @@ export interface UserDocument {
   employeeId: string | null;
   departmentId: string | null;
   positionId?: string;
+  jobTitle?: string; // Current job title from latest career movement
   hireDate?: Date;
   employmentStatus?: EmploymentStatus;
 
@@ -532,4 +533,42 @@ export interface SystemSettings {
   
   updatedAt: Date;
   updatedBy: string;
+}
+
+// ============================================
+// CAREER MOVEMENT TYPES
+// ============================================
+
+export type MovementType = 'hire' | 'promotion' | 'transfer' | 'salary_adjustment' | 'demotion' | 'regularization';
+
+export interface CareerMovement {
+  id: string;
+  
+  // Employee Reference
+  employeeId: string; // uid from users collection
+  
+  // Movement Details
+  movementType: MovementType;
+  effectiveDate: Date;
+  
+  // Position Information
+  jobTitle: string;
+  departmentId: string | null;
+  
+  // Salary Information (not displayed in profile)
+  salary: number;
+  
+  // Previous values (for tracking changes)
+  previousJobTitle?: string;
+  previousDepartmentId?: string | null;
+  previousSalary?: number;
+  
+  // Additional Info
+  remarks?: string;
+  
+  // System Fields
+  createdAt: Date;
+  createdBy: string;
+  updatedAt?: Date;
+  updatedBy?: string;
 }

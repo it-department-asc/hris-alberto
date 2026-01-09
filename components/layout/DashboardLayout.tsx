@@ -3,27 +3,33 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
-  // Initialize sidebar collapsed state from localStorage
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('sidebarCollapsed');
-      return saved ? JSON.parse(saved) : false;
-    }
-    return false;
-  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Save sidebar collapsed state to localStorage whenever it changes
+  // Initialize and reset sidebar state when user changes
   useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarCollapsed));
-  }, [sidebarCollapsed]);
+    if (user?.uid && typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`sidebarCollapsed_${user.uid}`);
+      setSidebarCollapsed(saved ? JSON.parse(saved) : false);
+    } else {
+      setSidebarCollapsed(false); // Default to expanded when no user
+    }
+  }, [user?.uid]);
+
+  // Save sidebar collapsed state to localStorage whenever it changes (user-specific)
+  useEffect(() => {
+    if (user?.uid && typeof window !== 'undefined') {
+      localStorage.setItem(`sidebarCollapsed_${user.uid}`, JSON.stringify(sidebarCollapsed));
+    }
+  }, [sidebarCollapsed, user?.uid]);
 
   const handleToggleCollapse = (collapsed: boolean) => {
     setSidebarCollapsed(collapsed);
