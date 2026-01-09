@@ -381,14 +381,14 @@ export function LeaveRequestForm({ userId, userName, userBirthday, isOpen, onClo
           </div>
 
           {/* Balance Warning */}
-          {currentBalance.remaining <= 2 && currentBalance.remaining > 0 && (
+          {/* {currentBalance.remaining <= 2 && currentBalance.remaining > 0 && (
             <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               <p className="text-xs text-amber-700">
                 Low balance: Only {currentBalance.remaining} {selectedLeaveType} leave day(s) remaining
               </p>
             </div>
-          )}
+          )} */}
 
           {/* Reason */}
           <div>
