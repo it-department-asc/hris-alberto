@@ -6,8 +6,10 @@ import { DashboardLayout } from '@/components/layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllEmployees, updateEmployee, createEmployee, toggleEmployeeStatus, generateNextEmployeeId } from '@/lib/firebase/employees';
 import { getDepartments } from '@/lib/firebase/departments';
-import { UserDocument, Department, UserRole } from '@/types';
+import { UserDocument, Department, UserRole, SimpleLeaveRequest, LeaveTypeName, LEAVE_LIMITS } from '@/types';
 import { useConfirm } from '@/hooks/use-confirm';
+import { subscribeToEmployeeLeaveRequests } from '@/lib/firebase/leave-requests';
+import { getAllLeaveBalances } from '@/lib/firebase/leave-utils';
 import toast from 'react-hot-toast';
 import {
   Users,
@@ -48,6 +50,7 @@ import {
   Home,
   Laptop,
   AlertTriangle,
+  AlertTriangle as AlertTriangleIcon,
   FileWarning,
   Gavel,
   CreditCard,
@@ -56,6 +59,9 @@ import {
   CheckCircle2,
   XCircle,
   MinusCircle,
+  Cake,
+  Heart,
+  Thermometer,
 } from 'lucide-react';
 import {
   Dialog,
@@ -66,7 +72,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { UserSeedButton } from '@/components/UserSeedButton';
-import { MovementTrackerTab } from './components';
+import { MovementTrackerTab, PermissionsTab, ApprovalsTab, LeaveHistory } from './components';
 
 // Status badge component
 function StatusBadge({ isActive }: { isActive: boolean }) {
@@ -177,6 +183,7 @@ function EmployeeDetailModal({
   employee,
   department,
   departments,
+  allEmployees,
   isOpen,
   onClose,
   onEdit,
@@ -188,6 +195,7 @@ function EmployeeDetailModal({
   employee: UserDocument | null;
   department: Department | undefined;
   departments: Department[];
+  allEmployees: UserDocument[];
   isOpen: boolean;
   onClose: () => void;
   onEdit: () => void;
@@ -223,11 +231,13 @@ function EmployeeDetailModal({
     { id: 'filings', label: 'Filings', icon: FileText },
     { id: 'relations', label: 'Relations', icon: Scale },
     { id: 'payslip', label: 'Payslip', icon: Receipt },
+    { id: 'permissions', label: 'Permissions', icon: Key },
+    { id: 'approvals', label: 'Approvals', icon: UserCheck },
   ];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] min-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-5xl max-h-[90vh] min-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-xl">Employee Profile</DialogTitle>
           <DialogDescription>View and manage employee information</DialogDescription>
@@ -328,6 +338,21 @@ function EmployeeDetailModal({
           {activeTab === 'payslip' && (
             <PayslipTab employee={employee} />
           )}
+          {activeTab === 'permissions' && (
+            <PermissionsTab 
+              employee={employee} 
+              currentUserId={currentUserId || ''} 
+              canEdit={canEdit} 
+            />
+          )}
+          {activeTab === 'approvals' && (
+            <ApprovalsTab 
+              employee={employee} 
+              allEmployees={allEmployees} 
+              currentUserId={currentUserId || ''} 
+              canEdit={canEdit} 
+            />
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -349,6 +374,7 @@ function ProfileTab({ employee, department }: { employee: UserDocument; departme
           <InfoItem label="Personal Email" value={employee.personalEmail} />
           <InfoItem label="Mobile" value={employee.mobileNumber} />
           <InfoItem label="Telephone" value={employee.telephoneNumber} />
+          <InfoItem label="Date of Birth" value={employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : undefined} />
         </div>
       </div>
 
@@ -420,17 +446,35 @@ function ProfileTab({ employee, department }: { employee: UserDocument; departme
 
 // Leave Tracker Tab
 function LeaveTrackerTab({ employee }: { employee: UserDocument }) {
-  const leaveBalances = [
-    { type: 'Vacation Leave', total: 15, used: 5, remaining: 10 },
-    { type: 'Sick Leave', total: 15, used: 3, remaining: 12 },
-    { type: 'Emergency Leave', total: 5, used: 1, remaining: 4 },
-    { type: 'Birthday Leave', total: 1, used: 0, remaining: 1 },
-  ];
+  const [leaveRequests, setLeaveRequests] = useState<SimpleLeaveRequest[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const leaveHistory = [
-    { id: 1, type: 'Vacation Leave', startDate: '2025-12-20', endDate: '2025-12-24', days: 5, status: 'approved' },
-    { id: 2, type: 'Sick Leave', startDate: '2025-11-10', endDate: '2025-11-12', days: 3, status: 'approved' },
-    { id: 3, type: 'Emergency Leave', startDate: '2025-09-05', endDate: '2025-09-05', days: 1, status: 'approved' },
+  useEffect(() => {
+    if (employee?.uid) {
+      setLoading(true);
+      const unsubscribe = subscribeToEmployeeLeaveRequests(employee.uid, (requests) => {
+        setLeaveRequests(requests);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }
+  }, [employee?.uid]);
+
+  // Calculate leave balances from actual requests
+  const leaveBalances = getAllLeaveBalances(leaveRequests);
+  
+  // Get birthday info for display
+  const birthday = employee.birthday || employee.dateOfBirth;
+  const birthdayMonth = birthday 
+    ? new Date(birthday).toLocaleString('default', { month: 'long' })
+    : null;
+
+  const leaveTypes: { type: LeaveTypeName; label: string; icon: typeof Plane; color: string }[] = [
+    { type: 'vacation', label: 'Vacation', icon: Plane, color: 'blue' },
+    { type: 'sick', label: 'Sick', icon: Thermometer, color: 'emerald' },
+    { type: 'emergency', label: 'Emergency', icon: AlertTriangleIcon, color: 'amber' },
+    { type: 'birthday', label: 'Birthday', icon: Cake, color: 'pink' },
+    { type: 'bereavement', label: 'Bereavement', icon: Heart, color: 'purple' },
   ];
 
   const getStatusBadge = (status: string) => {
@@ -438,32 +482,73 @@ function LeaveTrackerTab({ employee }: { employee: UserDocument }) {
       approved: 'bg-green-100 text-green-700',
       pending: 'bg-amber-100 text-amber-700',
       rejected: 'bg-red-100 text-red-700',
+      cancelled: 'bg-slate-100 text-slate-600',
     };
     return colors[status] || 'bg-slate-100 text-slate-700';
   };
 
+  const getLeaveTypeIcon = (type: LeaveTypeName) => {
+    const config = leaveTypes.find(lt => lt.type === type);
+    if (!config) return <CalendarDays className="h-4 w-4 text-slate-400" />;
+    const Icon = config.icon;
+    return <Icon className={`h-4 w-4 text-${config.color}-500`} />;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="py-2 space-y-4">
+      {/* Birthday Info */}
+      {birthday && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-pink-50 border border-pink-200">
+          <Cake className="h-5 w-5 text-pink-500" />
+          <div>
+            <p className="text-sm font-medium text-pink-800">Birthday</p>
+            <p className="text-xs text-pink-600">
+              {new Date(birthday).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+              {' '}— Birthday leave available in {birthdayMonth}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Leave Balances */}
       <div className="rounded-xl border border-slate-200 p-4">
         <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-blue-500" />
-          Leave Balances
+          Leave Balances ({new Date().getFullYear()})
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {leaveBalances.map((leave, idx) => (
-            <div key={idx} className="p-3 bg-slate-50 rounded-lg text-center">
-              <p className="text-xs text-slate-500 mb-1">{leave.type}</p>
-              <p className="text-2xl font-bold text-slate-900">{leave.remaining}</p>
-              <p className="text-xs text-slate-400">of {leave.total} days</p>
-              <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full"
-                  style={{ width: `${(leave.remaining / leave.total) * 100}%` }}
-                />
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {leaveTypes.map((lt) => {
+            const balance = leaveBalances[lt.type];
+            const Icon = lt.icon;
+            return (
+              <div key={lt.type} className="p-3 bg-slate-50 rounded-lg text-center">
+                <Icon className={`h-4 w-4 mx-auto mb-1 text-${lt.color}-500`} />
+                <p className="text-xs text-slate-500 mb-1">{lt.label}</p>
+                <p className={`text-xl font-bold text-${lt.color}-600`}>{balance.remaining}</p>
+                <p className="text-[10px] text-slate-400">of {balance.total} days</p>
+                <div className="mt-2 h-1 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${
+                      lt.color === 'blue' ? 'bg-blue-500' :
+                      lt.color === 'emerald' ? 'bg-emerald-500' :
+                      lt.color === 'amber' ? 'bg-amber-500' :
+                      lt.color === 'pink' ? 'bg-pink-500' :
+                      'bg-purple-500'
+                    }`}
+                    style={{ width: `${(balance.used / balance.total) * 100}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -474,20 +559,38 @@ function LeaveTrackerTab({ employee }: { employee: UserDocument }) {
             <Clock className="h-4 w-4 text-blue-500" />
             Leave History
           </h3>
+          <span className="text-xs text-slate-500">{leaveRequests.length} requests</span>
         </div>
-        <div className="space-y-2">
-          {leaveHistory.map((leave) => (
-            <div key={leave.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-slate-900">{leave.type}</p>
-                <p className="text-xs text-slate-500">{leave.startDate} — {leave.endDate} ({leave.days} day{leave.days > 1 ? 's' : ''})</p>
+        
+        {leaveRequests.length === 0 ? (
+          <div className="text-center py-8">
+            <CalendarDays className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+            <p className="text-sm text-slate-500">No leave requests found</p>
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            {leaveRequests.map((leave) => (
+              <div key={leave.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  {getLeaveTypeIcon(leave.leaveType)}
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 capitalize">
+                      {leave.leaveType.replace('_', ' ')} Leave
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {new Date(leave.startDate).toLocaleDateString()} 
+                      {leave.totalDays > 1 && ` — ${new Date(leave.endDate).toLocaleDateString()}`}
+                      {' '}({leave.totalDays} day{leave.totalDays > 1 ? 's' : ''})
+                    </p>
+                  </div>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full capitalize ${getStatusBadge(leave.status)}`}>
+                  {leave.status}
+                </span>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full capitalize ${getStatusBadge(leave.status)}`}>
-                {leave.status}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -812,8 +915,8 @@ function PayslipTab({ employee }: { employee: UserDocument }) {
             <p className="text-xl font-bold text-orange-600">{attendance.undertime}</p>
             <p className="text-xs text-slate-500">Undertime</p>
           </div>
-          <div className="text-center p-2 bg-red-50 rounded-lg">
-            <p className="text-xl font-bold text-red-600">{attendance.absent}</p>
+          <div className="text-center p-2 bg-emerald-50 rounded-lg">
+            <p className="text-xl font-bold text-emerald-500">{attendance.absent}</p>
             <p className="text-xs text-slate-500">Absent</p>
           </div>
           <div className="text-center p-2 bg-blue-50 rounded-lg">
@@ -904,6 +1007,7 @@ function EmployeeFormModal({
     departmentId: '',
     employeeId: '',
     hireDate: '',
+    birthday: '',
     employmentStatus: 'regular' as string,
     mobileNumber: '',
     personalEmail: '',
@@ -931,6 +1035,28 @@ function EmployeeFormModal({
         }
       }
 
+      // Handle birthday
+      let birthdayStr = '';
+      if (employee.birthday) {
+        const birthday = employee.birthday as any;
+        if (birthday.seconds) {
+          birthdayStr = new Date(birthday.seconds * 1000).toISOString().split('T')[0];
+        } else if (birthday instanceof Date) {
+          birthdayStr = birthday.toISOString().split('T')[0];
+        } else if (typeof birthday === 'string') {
+          birthdayStr = birthday;
+        }
+      } else if (employee.dateOfBirth) {
+        const dob = employee.dateOfBirth as any;
+        if (dob.seconds) {
+          birthdayStr = new Date(dob.seconds * 1000).toISOString().split('T')[0];
+        } else if (dob instanceof Date) {
+          birthdayStr = dob.toISOString().split('T')[0];
+        } else if (typeof dob === 'string') {
+          birthdayStr = dob;
+        }
+      }
+
       setFormData({
         email: employee.email || '',
         password: '',
@@ -941,6 +1067,7 @@ function EmployeeFormModal({
         departmentId: employee.departmentId || '',
         employeeId: employee.employeeId || '',
         hireDate: hireDateStr,
+        birthday: birthdayStr,
         employmentStatus: employee.employmentStatus || 'regular',
         mobileNumber: employee.mobileNumber || '',
         personalEmail: employee.personalEmail || '',
@@ -963,6 +1090,7 @@ function EmployeeFormModal({
         departmentId: '',
         employeeId: '',
         hireDate: '',
+        birthday: '',
         employmentStatus: 'regular',
         mobileNumber: '',
         personalEmail: '',
@@ -1076,6 +1204,20 @@ function EmployeeFormModal({
                   required
                   value={formData.lastName}
                   onChange={(e) => handleChange('lastName', e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+              <div className="sm:col-span-3">
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Cake className="h-4 w-4 text-pink-500" />
+                    Birthday <span className="text-xs text-slate-400">(for birthday leave)</span>
+                  </span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.birthday}
+                  onChange={(e) => handleChange('birthday', e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
@@ -1717,6 +1859,7 @@ function EmployeesContent() {
         employee={selectedEmployee}
         department={selectedEmployee ? getDepartmentById(selectedEmployee.departmentId) : undefined}
         departments={departments}
+        allEmployees={employees}
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         onEdit={() => handleEditEmployee(selectedEmployee!)}
