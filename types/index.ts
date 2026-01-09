@@ -15,7 +15,6 @@ export interface UserDocument {
   lastName: string;
   middleName?: string;
   dateOfBirth?: Date;
-  birthday?: Date; // Month and day for birthday leave eligibility
   gender?: Gender;
   civilStatus?: CivilStatus;
   nationality?: string;
@@ -667,6 +666,7 @@ export type NotificationType =
   | 'leave_rejected'
   | 'permission_updated'
   | 'approver_updated'
+  | 'announcement'
   | 'general';
 
 export interface Notification {

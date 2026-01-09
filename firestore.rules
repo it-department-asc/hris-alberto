@@ -297,14 +297,15 @@ service cloud.firestore {
     }
     
     // ============================================
+    // ============================================
     // ANNOUNCEMENTS COLLECTION
     // ============================================
     match /announcements/{announcementId} {
-      // All authenticated users can read published announcements
-      allow read: if isAuthenticated() && (resource.data.isPublished == true || isAdminOrHR());
+      // All authenticated users can read announcements
+      allow read: if isAuthenticated();
       
-      // Only admin/HR can manage announcements
-      allow create, update, delete: if isAdminOrHR();
+      // Only admin can manage announcements
+      allow create, update, delete: if isAdmin();
     }
     
     // ============================================

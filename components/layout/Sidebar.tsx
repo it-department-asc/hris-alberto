@@ -15,6 +15,7 @@ import {
   GitBranch,
   Building2,
   X,
+  Megaphone,
 } from 'lucide-react';
 import { UserRole } from '@/types';
 
@@ -27,6 +28,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'hr', 'payroll', 'manager', 'employee'] },
+  { href: '/bulletin-board', label: 'Bulletin Board', icon: Megaphone, roles: ['admin', 'hr', 'payroll', 'manager', 'employee'] },
   { href: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'hr'] },
   { href: '/departments', label: 'Departments', icon: Building2, roles: ['admin', 'hr', 'payroll', 'manager'] },
   { href: '/org-chart', label: 'Org Chart', icon: GitBranch, roles: ['admin', 'hr', 'payroll', 'manager', 'employee'] },
@@ -82,7 +84,6 @@ export function Sidebar({ collapsed = false, onToggleCollapse, onMobileClose }: 
               return (
                 <li 
                   key={item.href}
-                  className="animate-fadeIn"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <Link
@@ -96,7 +97,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, onMobileClose }: 
                     title={collapsed ? item.label : undefined}
                   >
                     {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full animate-slideIn" />
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full" />
                     )}
                     <Icon
                       className={`h-5 w-5 flex-shrink-0 transition-all duration-200 ${
