@@ -112,7 +112,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
         </nav>
 
         {/* User Section */}
-        <div className="border-t border-slate-700 p-4">
+        {/* <div className="border-t border-slate-700 p-4">
           {user && (
             <div className={`mb-4 ${collapsed ? 'text-center' : ''}`}>
               <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
@@ -155,7 +155,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
               {!collapsed && <span>Sign Out</span>}
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* Collapse Button */}
         <button

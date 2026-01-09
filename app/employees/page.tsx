@@ -66,16 +66,16 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { UserSeedButton } from '@/components/UserSeedButton';
+import { MovementTrackerTab } from './components';
 
 // Status badge component
 function StatusBadge({ isActive }: { isActive: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-        isActive
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${isActive
           ? 'bg-emerald-100 text-emerald-700'
           : 'bg-slate-100 text-slate-600'
-      }`}
+        }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
       {isActive ? 'Active' : 'Inactive'}
@@ -101,12 +101,12 @@ function RoleBadge({ role }: { role: UserRole }) {
 }
 
 // Employee Card Component
-function EmployeeCard({ 
-  employee, 
+function EmployeeCard({
+  employee,
   department,
-  onClick 
-}: { 
-  employee: UserDocument; 
+  onClick
+}: {
+  employee: UserDocument;
   department: Department | undefined;
   onClick: () => void;
 }) {
@@ -181,7 +181,9 @@ function EmployeeDetailModal({
   onClose,
   onEdit,
   onToggleStatus,
+  onRefresh,
   currentUserRole,
+  currentUserId,
 }: {
   employee: UserDocument | null;
   department: Department | undefined;
@@ -190,10 +192,25 @@ function EmployeeDetailModal({
   onClose: () => void;
   onEdit: () => void;
   onToggleStatus: () => void;
+  onRefresh: () => void;
   currentUserRole: UserRole;
+  currentUserId: string;
 }) {
   const [activeTab, setActiveTab] = useState('profile');
-  
+  const [lastEmployeeId, setLastEmployeeId] = useState<string | null>(null);
+
+  // Reset to profile tab only when modal opens with a DIFFERENT employee
+  useEffect(() => {
+    if (isOpen && employee?.uid && employee.uid !== lastEmployeeId) {
+      setActiveTab('profile');
+      setLastEmployeeId(employee.uid);
+    }
+    if (!isOpen) {
+      setLastEmployeeId(null);
+    }
+  }, [isOpen, employee?.uid, lastEmployeeId]);
+
+  // Early return AFTER all hooks
   if (!employee) return null;
 
   const initials = `${employee.firstName?.charAt(0) || ''}${employee.lastName?.charAt(0) || ''}`.toUpperCase() || 'U';
@@ -201,7 +218,7 @@ function EmployeeDetailModal({
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'movement', label: 'Movement', icon: TrendingUp },
+    { id: 'career', label: 'Career Timeline', icon: TrendingUp },
     { id: 'leave', label: 'Leave', icon: CalendarDays },
     { id: 'filings', label: 'Filings', icon: FileText },
     { id: 'relations', label: 'Relations', icon: Scale },
@@ -229,7 +246,7 @@ function EmployeeDetailModal({
               {initials}
             </div>
           )}
-          
+
           <div className="flex-1 text-center sm:text-left">
             <h2 className="text-xl font-bold text-slate-900">{employee.displayName}</h2>
             <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start items-center">
@@ -255,9 +272,9 @@ function EmployeeDetailModal({
                 <Edit3 className="h-4 w-4 mr-1" />
                 Edit
               </Button>
-              <Button 
+              <Button
                 variant={employee.isActive ? "destructive" : "default"}
-                size="sm" 
+                size="sm"
                 onClick={onToggleStatus}
               >
                 {employee.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
@@ -273,11 +290,10 @@ function EmployeeDetailModal({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  activeTab === tab.id
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                }`}
+                  }`}
               >
                 <tab.icon className="h-4 w-4" />
                 {tab.label}
@@ -291,8 +307,14 @@ function EmployeeDetailModal({
           {activeTab === 'profile' && (
             <ProfileTab employee={employee} department={department} />
           )}
-          {activeTab === 'movement' && (
-            <MovementTrackerTab employee={employee} />
+          {activeTab === 'career' && (
+            <MovementTrackerTab 
+              employee={employee} 
+              departments={departments}
+              currentUserId={currentUserId}
+              canEdit={canEdit}
+              onEmployeeUpdate={onRefresh}
+            />
           )}
           {activeTab === 'leave' && (
             <LeaveTrackerTab employee={employee} />
@@ -338,12 +360,13 @@ function ProfileTab({ employee, department }: { employee: UserDocument; departme
         </h3>
         <div className="grid sm:grid-cols-2 gap-3">
           <InfoItem label="Employee ID" value={employee.employeeId} />
+          <InfoItem label="Job Title" value={employee.jobTitle} />
           <InfoItem label="Department" value={department?.name} />
           <InfoItem label="Role" value={employee.role} capitalize />
           <InfoItem label="Status" value={employee.isActive ? 'Active' : 'Inactive'} />
-          <InfoItem 
-            label="Hire Date" 
-            value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : undefined} 
+          <InfoItem
+            label="Hire Date"
+            value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : undefined}
           />
           <InfoItem label="Employment Status" value={employee.employmentStatus} capitalize />
         </div>
@@ -381,91 +404,15 @@ function ProfileTab({ employee, department }: { employee: UserDocument; departme
           System Information
         </h3>
         <div className="grid sm:grid-cols-2 gap-3">
-          <InfoItem 
-            label="Created At" 
-            value={employee.createdAt ? new Date(employee.createdAt).toLocaleString() : undefined} 
+          <InfoItem
+            label="Created At"
+            value={employee.createdAt ? new Date(employee.createdAt).toLocaleString() : undefined}
           />
-          <InfoItem 
-            label="Last Login" 
-            value={employee.lastLoginAt ? new Date(employee.lastLoginAt).toLocaleString() : 'Never'} 
+          <InfoItem
+            label="Last Login"
+            value={employee.lastLoginAt ? new Date(employee.lastLoginAt).toLocaleString() : 'Never'}
           />
         </div>
-      </div>
-    </div>
-  );
-}
-
-// Movement Tracker Tab
-function MovementTrackerTab({ employee }: { employee: UserDocument }) {
-  // Mock data for demonstration
-  const movements = [
-    { id: 1, type: 'promotion', date: '2025-06-15', from: 'Junior Developer', to: 'Senior Developer', remarks: 'Excellent performance' },
-    { id: 2, type: 'salary', date: '2025-06-15', from: '₱35,000', to: '₱50,000', remarks: 'Promotion adjustment' },
-    { id: 3, type: 'transfer', date: '2024-01-10', from: 'IT Department', to: 'Engineering', remarks: 'Organizational restructuring' },
-  ];
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'promotion': return <ArrowUpRight className="h-4 w-4 text-green-500" />;
-      case 'transfer': return <ArrowRightLeft className="h-4 w-4 text-blue-500" />;
-      case 'salary': return <Banknote className="h-4 w-4 text-amber-500" />;
-      default: return <TrendingUp className="h-4 w-4 text-slate-500" />;
-    }
-  };
-
-  const getTypeBadge = (type: string) => {
-    const colors: Record<string, string> = {
-      promotion: 'bg-green-100 text-green-700',
-      transfer: 'bg-blue-100 text-blue-700',
-      salary: 'bg-amber-100 text-amber-700',
-    };
-    return colors[type] || 'bg-slate-100 text-slate-700';
-  };
-
-  return (
-    <div className="py-2">
-      <div className="rounded-xl border border-slate-200 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-blue-500" />
-            Employee Movement History
-          </h3>
-          <Button size="sm" variant="outline">
-            <Plus className="h-4 w-4 mr-1" />
-            Add Record
-          </Button>
-        </div>
-
-        {movements.length > 0 ? (
-          <div className="space-y-3">
-            {movements.map((movement) => (
-              <div key={movement.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                {getTypeIcon(movement.type)}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${getTypeBadge(movement.type)}`}>
-                      {movement.type}
-                    </span>
-                    <span className="text-xs text-slate-500">{movement.date}</span>
-                  </div>
-                  <p className="text-sm text-slate-700 mt-1">
-                    <span className="text-slate-500">{movement.from}</span>
-                    <span className="mx-2">→</span>
-                    <span className="font-medium">{movement.to}</span>
-                  </p>
-                  {movement.remarks && (
-                    <p className="text-xs text-slate-500 mt-1">{movement.remarks}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-slate-500">
-            <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No movement records found</p>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -510,7 +457,7 @@ function LeaveTrackerTab({ employee }: { employee: UserDocument }) {
               <p className="text-2xl font-bold text-slate-900">{leave.remaining}</p>
               <p className="text-xs text-slate-400">of {leave.total} days</p>
               <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-blue-500 rounded-full"
                   style={{ width: `${(leave.remaining / leave.total) * 100}%` }}
                 />
@@ -909,13 +856,13 @@ function PayslipTab({ employee }: { employee: UserDocument }) {
 }
 
 // Info Item Component
-function InfoItem({ 
-  label, 
-  value, 
+function InfoItem({
+  label,
+  value,
   capitalize = false,
-  fullWidth = false 
-}: { 
-  label: string; 
+  fullWidth = false
+}: {
+  label: string;
   value: string | null | undefined;
   capitalize?: boolean;
   fullWidth?: boolean;
@@ -983,7 +930,7 @@ function EmployeeFormModal({
           hireDateStr = hireDate;
         }
       }
-      
+
       setFormData({
         email: employee.email || '',
         password: '',
@@ -1337,7 +1284,7 @@ function EmployeesContent() {
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  
+
   // Modal states
   const [selectedEmployee, setSelectedEmployee] = useState<UserDocument | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -1363,11 +1310,24 @@ function EmployeesContent() {
       ]);
       setEmployees(employeeList);
       setDepartments(departmentList);
+      return employeeList;
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load employees');
+      return null;
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Refresh data and update selectedEmployee with fresh data (for career updates)
+  const refreshEmployeeData = async () => {
+    const employeeList = await fetchData();
+    if (employeeList && selectedEmployee) {
+      const updatedEmployee = employeeList.find(e => e.uid === selectedEmployee.uid);
+      if (updatedEmployee) {
+        setSelectedEmployee(updatedEmployee);
+      }
     }
   };
 
@@ -1381,7 +1341,7 @@ function EmployeesContent() {
     return employees.filter(employee => {
       // Search filter
       const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         employee.displayName?.toLowerCase().includes(searchLower) ||
         employee.email?.toLowerCase().includes(searchLower) ||
         employee.employeeId?.toLowerCase().includes(searchLower) ||
@@ -1395,7 +1355,7 @@ function EmployeesContent() {
       const matchesRole = !filterRole || employee.role === filterRole;
 
       // Status filter
-      const matchesStatus = !filterStatus || 
+      const matchesStatus = !filterStatus ||
         (filterStatus === 'active' && employee.isActive) ||
         (filterStatus === 'inactive' && !employee.isActive);
 
@@ -1549,12 +1509,12 @@ function EmployeesContent() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <UserSeedButton 
-            createdBy={user?.uid || ''} 
-            departments={departments} 
-            onComplete={fetchData} 
+          <UserSeedButton
+            createdBy={user?.uid || ''}
+            departments={departments}
+            onComplete={fetchData}
           />
-          <button 
+          <button
             onClick={handleAddEmployee}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 font-medium text-white shadow-lg shadow-blue-500/25 transition-all hover:shadow-xl hover:scale-[1.02]"
           >
@@ -1626,15 +1586,14 @@ function EmployeesContent() {
               className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
-          
+
           {/* Filter Toggle */}
-          <button 
+          <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-3 font-medium transition-colors ${
-              showFilters || hasActiveFilters
+            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-3 font-medium transition-colors ${showFilters || hasActiveFilters
                 ? 'border-blue-200 bg-blue-50 text-blue-700'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
+              }`}
           >
             <Filter className="h-5 w-5" />
             Filters
@@ -1726,7 +1685,7 @@ function EmployeesContent() {
           <Users className="mx-auto h-12 w-12 text-slate-300" />
           <h3 className="mt-4 text-lg font-medium text-slate-900">No employees found</h3>
           <p className="mt-2 text-slate-500">
-            {hasActiveFilters 
+            {hasActiveFilters
               ? 'Try adjusting your filters or search term'
               : 'Add your first employee to get started'}
           </p>
@@ -1762,7 +1721,9 @@ function EmployeesContent() {
         onClose={() => setIsDetailOpen(false)}
         onEdit={() => handleEditEmployee(selectedEmployee!)}
         onToggleStatus={handleToggleStatus}
+        onRefresh={refreshEmployeeData}
         currentUserRole={user?.role || 'employee'}
+        currentUserId={user?.uid || ''}
       />
 
       <EmployeeFormModal

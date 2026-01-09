@@ -326,6 +326,19 @@ service cloud.firestore {
     }
     
     // ============================================
+    // CAREER MOVEMENTS COLLECTION
+    // ============================================
+    match /careerMovements/{movementId} {
+      // Employees can read their own career history, admin/HR can read all
+      allow read: if isAuthenticated() && (resource.data.employeeId == request.auth.uid || isAdminOrHR());
+      
+      // Only admin/HR can create, update, delete career movements
+      allow create: if isAdminOrHR();
+      allow update: if isAdminOrHR();
+      allow delete: if isAdminOrHR();
+    }
+    
+    // ============================================
     // SYSTEM SETTINGS COLLECTION
     // ============================================
     match /settings/{settingId} {
