@@ -136,7 +136,7 @@ function LeaveContent() {
       <LeaveRequestForm
         userId={user.uid}
         userName={userName}
-        userBirthday={user.birthday || user.dateOfBirth}
+        userBirthday={user.dateOfBirth}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
       />

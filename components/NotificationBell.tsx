@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Bell,
   Check,
@@ -11,6 +12,7 @@ import {
   UserCheck,
   Info,
   Loader2,
+  Megaphone,
 } from 'lucide-react';
 import { Notification, NotificationType } from '@/types';
 import { 
@@ -31,6 +33,7 @@ const notificationIcons: Record<NotificationType, typeof Bell> = {
   leave_rejected: X,
   permission_updated: Shield,
   approver_updated: UserCheck,
+  announcement: Megaphone,
   general: Info,
 };
 
@@ -40,6 +43,7 @@ const notificationColors: Record<NotificationType, string> = {
   leave_rejected: 'bg-red-100 text-red-600',
   permission_updated: 'bg-purple-100 text-purple-600',
   approver_updated: 'bg-amber-100 text-amber-600',
+  announcement: 'bg-indigo-100 text-indigo-600',
   general: 'bg-slate-100 text-slate-600',
 };
 
@@ -49,6 +53,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const unsubNotifications = subscribeToUserNotifications(userId, (data) => {
@@ -77,6 +82,23 @@ export function NotificationBell({ userId }: NotificationBellProps) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read if unread
+    if (!notification.isRead) {
+      try {
+        await markNotificationAsRead(notification.id);
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
+    
+    // Navigate to link if available
+    if (notification.data?.link) {
+      setIsOpen(false);
+      router.push(notification.data.link);
+    }
+  };
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
@@ -146,10 +168,10 @@ export function NotificationBell({ userId }: NotificationBellProps) {
                   return (
                     <div
                       key={notification.id}
-                      onClick={() => !notification.isRead && handleMarkAsRead(notification.id)}
+                      onClick={() => handleNotificationClick(notification)}
                       className={`px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer ${
                         !notification.isRead ? 'bg-blue-50/50' : ''
-                      }`}
+                      } ${notification.data?.link ? 'hover:bg-blue-50' : ''}`}
                     >
                       <div className="flex gap-3">
                         <div className={`flex items-center justify-center h-9 w-9 rounded-lg shrink-0 ${colorClass}`}>

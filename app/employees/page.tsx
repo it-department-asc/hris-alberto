@@ -374,7 +374,32 @@ function ProfileTab({ employee, department }: { employee: UserDocument; departme
           <InfoItem label="Personal Email" value={employee.personalEmail} />
           <InfoItem label="Mobile" value={employee.mobileNumber} />
           <InfoItem label="Telephone" value={employee.telephoneNumber} />
-          <InfoItem label="Date of Birth" value={employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : undefined} />
+          <InfoItem label="Date of Birth" value={
+            (() => {
+              const dateOfBirth = employee.dateOfBirth;
+              if (!dateOfBirth) return undefined;
+              
+              try {
+                // Handle Firestore Timestamp
+                if (dateOfBirth && typeof dateOfBirth === 'object' && (dateOfBirth as any).seconds) {
+                  return new Date((dateOfBirth as any).seconds * 1000).toLocaleDateString();
+                }
+                // Handle Date object
+                if (dateOfBirth instanceof Date) {
+                  return dateOfBirth.toLocaleDateString();
+                }
+                // Handle string
+                if (typeof dateOfBirth === 'string') {
+                  return new Date(dateOfBirth).toLocaleDateString();
+                }
+              } catch (error) {
+                console.error('Error parsing dateOfBirth:', error);
+                return undefined;
+              }
+              
+              return undefined;
+            })()
+          } />
         </div>
       </div>
 
@@ -464,9 +489,9 @@ function LeaveTrackerTab({ employee }: { employee: UserDocument }) {
   const leaveBalances = getAllLeaveBalances(leaveRequests);
   
   // Get birthday info for display
-  const birthday = employee.birthday || employee.dateOfBirth;
-  const birthdayMonth = birthday 
-    ? new Date(birthday).toLocaleString('default', { month: 'long' })
+  const dateOfBirth = employee.dateOfBirth;
+  const birthdayMonth = dateOfBirth 
+    ? new Date(dateOfBirth).toLocaleString('default', { month: 'long' })
     : null;
 
   const leaveTypes: { type: LeaveTypeName; label: string; icon: typeof Plane; color: string }[] = [
@@ -505,13 +530,13 @@ function LeaveTrackerTab({ employee }: { employee: UserDocument }) {
   return (
     <div className="py-2 space-y-4">
       {/* Birthday Info */}
-      {birthday && (
+      {dateOfBirth && (
         <div className="flex items-center gap-3 p-3 rounded-xl bg-pink-50 border border-pink-200">
           <Cake className="h-5 w-5 text-pink-500" />
           <div>
             <p className="text-sm font-medium text-pink-800">Birthday</p>
             <p className="text-xs text-pink-600">
-              {new Date(birthday).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+              {new Date(dateOfBirth).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
               {' '}— Birthday leave available in {birthdayMonth}
             </p>
           </div>
@@ -1007,7 +1032,7 @@ function EmployeeFormModal({
     departmentId: '',
     employeeId: '',
     hireDate: '',
-    birthday: '',
+    dateOfBirth: '',
     employmentStatus: 'regular' as string,
     mobileNumber: '',
     personalEmail: '',
@@ -1035,25 +1060,16 @@ function EmployeeFormModal({
         }
       }
 
-      // Handle birthday
-      let birthdayStr = '';
-      if (employee.birthday) {
-        const birthday = employee.birthday as any;
-        if (birthday.seconds) {
-          birthdayStr = new Date(birthday.seconds * 1000).toISOString().split('T')[0];
-        } else if (birthday instanceof Date) {
-          birthdayStr = birthday.toISOString().split('T')[0];
-        } else if (typeof birthday === 'string') {
-          birthdayStr = birthday;
-        }
-      } else if (employee.dateOfBirth) {
+      // Handle dateOfBirth
+      let dateOfBirthStr = '';
+      if (employee.dateOfBirth) {
         const dob = employee.dateOfBirth as any;
         if (dob.seconds) {
-          birthdayStr = new Date(dob.seconds * 1000).toISOString().split('T')[0];
+          dateOfBirthStr = new Date(dob.seconds * 1000).toISOString().split('T')[0];
         } else if (dob instanceof Date) {
-          birthdayStr = dob.toISOString().split('T')[0];
+          dateOfBirthStr = dob.toISOString().split('T')[0];
         } else if (typeof dob === 'string') {
-          birthdayStr = dob;
+          dateOfBirthStr = dob;
         }
       }
 
@@ -1067,7 +1083,7 @@ function EmployeeFormModal({
         departmentId: employee.departmentId || '',
         employeeId: employee.employeeId || '',
         hireDate: hireDateStr,
-        birthday: birthdayStr,
+        dateOfBirth: dateOfBirthStr,
         employmentStatus: employee.employmentStatus || 'regular',
         mobileNumber: employee.mobileNumber || '',
         personalEmail: employee.personalEmail || '',
@@ -1090,7 +1106,7 @@ function EmployeeFormModal({
         departmentId: '',
         employeeId: '',
         hireDate: '',
-        birthday: '',
+        dateOfBirth: '',
         employmentStatus: 'regular',
         mobileNumber: '',
         personalEmail: '',
@@ -1216,8 +1232,8 @@ function EmployeeFormModal({
                 </label>
                 <input
                   type="date"
-                  value={formData.birthday}
-                  onChange={(e) => handleChange('birthday', e.target.value)}
+                  value={formData.dateOfBirth}
+                  onChange={(e) => handleChange('dateOfBirth', e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
@@ -1553,6 +1569,7 @@ function EmployeesContent() {
           departmentId: formData.departmentId || null,
           employeeId: formData.employeeId || null,
           hireDate: formData.hireDate ? new Date(formData.hireDate) : undefined,
+          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth) : undefined,
           employmentStatus: formData.employmentStatus || undefined,
           mobileNumber: formData.mobileNumber || undefined,
           personalEmail: formData.personalEmail || undefined,
