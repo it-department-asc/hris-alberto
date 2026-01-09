@@ -15,6 +15,7 @@ export interface UserDocument {
   lastName: string;
   middleName?: string;
   dateOfBirth?: Date;
+  birthday?: Date; // Month and day for birthday leave eligibility
   gender?: Gender;
   civilStatus?: CivilStatus;
   nationality?: string;
@@ -571,4 +572,111 @@ export interface CareerMovement {
   createdBy: string;
   updatedAt?: Date;
   updatedBy?: string;
+}
+// ============================================
+// PERMISSION TYPES
+// ============================================
+
+export type PermissionLevel = 'none' | 'view' | 'edit';
+
+export type ModuleName = 
+  | 'dashboard'
+  | 'employees'
+  | 'departments'
+  | 'attendance'
+  | 'leave'
+  | 'payroll'
+  | 'organization'
+  | 'org-chart'
+  | 'settings'
+  | 'policy-advisor';
+
+export interface ModulePermission {
+  module: ModuleName;
+  level: PermissionLevel;
+}
+
+export interface UserPermissions {
+  id: string;
+  userId: string;
+  permissions: ModulePermission[];
+  createdAt: Date;
+  updatedAt: Date;
+  updatedBy: string;
+}
+
+// ============================================
+// LEAVE APPROVER TYPES
+// ============================================
+
+export type LeaveTypeName = 'vacation' | 'sick' | 'emergency' | 'birthday' | 'bereavement';
+
+// Leave balance limits per year
+export const LEAVE_LIMITS: Record<LeaveTypeName, number> = {
+  vacation: 10,
+  sick: 10,
+  emergency: 3,
+  birthday: 1,
+  bereavement: 5,
+};
+
+export interface LeaveApprover {
+  leaveType: LeaveTypeName;
+  approverId: string | null; // userId of approver
+}
+
+export interface UserLeaveApprovers {
+  id: string;
+  userId: string;
+  approvers: LeaveApprover[];
+  createdAt: Date;
+  updatedAt: Date;
+  updatedBy: string;
+}
+
+// ============================================
+// SIMPLE LEAVE REQUEST TYPES (for approval workflow)
+// ============================================
+
+export interface SimpleLeaveRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  leaveType: LeaveTypeName;
+  startDate: Date;
+  endDate: Date;
+  totalDays: number;
+  reason: string;
+  status: LeaveRequestStatus;
+  approverId: string | null;
+  approverName?: string;
+  approvedAt?: Date;
+  rejectedAt?: Date;
+  rejectionReason?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
+// NOTIFICATION TYPES
+// ============================================
+
+export type NotificationType = 
+  | 'leave_request'
+  | 'leave_approved'
+  | 'leave_rejected'
+  | 'permission_updated'
+  | 'approver_updated'
+  | 'general';
+
+export interface Notification {
+  id: string;
+  userId: string; // recipient
+  type: NotificationType;
+  title: string;
+  message: string;
+  data?: Record<string, any>; // additional data like leaveRequestId
+  isRead: boolean;
+  createdAt: Date;
+  readAt?: Date;
 }

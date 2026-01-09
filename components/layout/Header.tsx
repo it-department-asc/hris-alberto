@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { NotificationBell } from '@/components/NotificationBell';
 import {
-  Bell,
   Search,
   ChevronDown,
   User,
@@ -19,7 +19,6 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, signOut } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
 
   // Get current display name from user data
   const currentDisplayName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || 'User';
@@ -30,19 +29,16 @@ export function Header({ onMenuClick }: HeaderProps) {
       if (showUserMenu && !(event.target as Element).closest('.user-menu-container')) {
         setShowUserMenu(false);
       }
-      if (showNotifications && !(event.target as Element).closest('.notifications-container')) {
-        setShowNotifications(false);
-      }
     };
 
-    if (showUserMenu || showNotifications) {
+    if (showUserMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showUserMenu, showNotifications]);
+  }, [showUserMenu]);
 
   const handleSignOut = async () => {
     try {
@@ -78,51 +74,14 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       {/* Right Section */}
       <div className="flex items-center gap-2">
-        {/* Notifications */}
-        <div className="relative notifications-container">
-          <button
-            onClick={() => {
-              setShowNotifications(!showNotifications);
-              setShowUserMenu(false);
-            }}
-            className="relative rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500"></span>
-          </button>
-
-          {showNotifications && (
-            <div className="absolute right-0 top-full z-20 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
-                <h3 className="mb-3 text-sm font-semibold text-slate-900">
-                  Notifications
-                </h3>
-                <div className="space-y-3">
-                  <div className="rounded-lg bg-blue-50 p-3">
-                    <p className="text-sm font-medium text-slate-900">
-                      Leave request pending
-                    </p>
-                    <p className="text-xs text-slate-500">2 minutes ago</p>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-sm font-medium text-slate-900">
-                      Payroll processed
-                    </p>
-                    <p className="text-xs text-slate-500">1 hour ago</p>
-                  </div>
-                </div>
-                <button className="mt-3 w-full text-center text-sm font-medium text-blue-600 hover:text-blue-700">
-                  View all notifications
-                </button>
-              </div>
-          )}
-        </div>
+        {/* Real-time Notifications */}
+        {user?.uid && <NotificationBell userId={user.uid} />}
 
         {/* User Menu */}
         <div className="relative user-menu-container">
           <button
             onClick={() => {
               setShowUserMenu(!showUserMenu);
-              setShowNotifications(false);
             }}
             className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-slate-100"
           >

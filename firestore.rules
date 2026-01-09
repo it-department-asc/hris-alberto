@@ -86,8 +86,8 @@ service cloud.firestore {
     // USERS COLLECTION
     // ============================================
     match /users/{userId} {
-      // Users can read their own document, admin/HR can read all
-      allow read: if isOwner(userId) || isAdminOrHR();
+      // All authenticated users can read basic user info for organizational purposes
+      allow read: if isAuthenticated();
       
       // Only the user can create their own document (during registration)
       // Admin/HR can also create user documents (for adding employees)
@@ -191,8 +191,8 @@ service cloud.firestore {
     // LEAVE BALANCES COLLECTION
     // ============================================
     match /leaveBalances/{balanceId} {
-      // Employees can read their own, admin/HR can read all
-      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isAdminOrHR();
+      // Employees can read their own, management can read all
+      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isManagement();
       
       // Only admin/HR can manage leave balances
       allow create, update, delete: if isAdminOrHR();
@@ -202,17 +202,22 @@ service cloud.firestore {
     // LEAVE REQUESTS COLLECTION
     // ============================================
     match /leaveRequests/{requestId} {
-      // Employees can read their own, management can read all
-      allow read: if isOwnEmployeeRecord(resource.data.employeeId) || isManagement();
+      // Employees can read their own, approvers can read requests assigned to them, management can read all
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || 
+        resource.data.approverId == request.auth.uid ||
+        isManagement()
+      );
       
       // Employees can create their own leave requests
-      allow create: if isOwnEmployeeRecord(request.resource.data.employeeId);
+      allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
       
-      // Employees can cancel their own pending requests, management can approve/reject
-      allow update: if isManagement() 
-                    || (isOwnEmployeeRecord(resource.data.employeeId) 
-                        && resource.data.status == 'pending'
-                        && request.resource.data.status == 'cancelled');
+      // Employees can cancel their own pending requests, assigned approver can approve/reject, management can approve/reject all
+      allow update: if isAuthenticated() && (
+        isManagement() ||
+        (resource.data.approverId == request.auth.uid && resource.data.status == 'pending') ||
+        (resource.data.employeeId == request.auth.uid && resource.data.status == 'pending' && request.resource.data.status == 'cancelled')
+      );
       
       // Only admin can delete
       allow delete: if isAdmin();
@@ -344,6 +349,45 @@ service cloud.firestore {
     match /settings/{settingId} {
       // TEMPORARY: Allow all operations for authenticated users during seeding
       allow read, write: if allowAllForSeeding();
+    }
+    
+    // ============================================
+    // USER PERMISSIONS COLLECTION
+    // ============================================
+    match /userPermissions/{userId} {
+      // Users can read their own permissions, admin/HR can read all
+      allow read: if isOwner(userId) || isAdminOrHR();
+      
+      // Only admin/HR can manage permissions
+      allow create, update, delete: if isAdminOrHR();
+    }
+    
+    // ============================================
+    // USER LEAVE APPROVERS COLLECTION
+    // ============================================
+    match /userLeaveApprovers/{userId} {
+      // Users can read their own approvers, admin/HR can read all
+      allow read: if isOwner(userId) || isAdminOrHR();
+      
+      // Only admin/HR can manage leave approvers
+      allow create, update, delete: if isAdminOrHR();
+    }
+    
+    // ============================================
+    // NOTIFICATIONS COLLECTION
+    // ============================================
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // System/authenticated users can create notifications (for leave requests, etc.)
+      allow create: if isAuthenticated();
+      
+      // Users can update their own notifications (mark as read)
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Users can delete their own notifications, admin can delete all
+      allow delete: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
     }
   }
 }
